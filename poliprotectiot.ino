@@ -8,7 +8,6 @@
 #include <FS.h>
 #include <Firebase_ESP_Client.h>
 #include "esp_camera.h"
-#include "Base64.h"
 #endif
 
 // Provide the token generation process info.
@@ -75,9 +74,11 @@ int led_duty = 90;
 
 // Leds that indicate any system states 
 #define LED_ON                    12
-#define LED_IS_CONNECTED          13
-#define LED_ISNT_CONNECTED        15
-#define LED_AUTH                  0
+#define LED_NO_GPS                13
+#define LED_AUTH                  15
+#define LED_IS_CONNECTED          14
+#define LED_ISNT_CONNECTED        2
+
 
 // ===========================
 //     Device Information
@@ -122,12 +123,14 @@ void pinConfig() {
   pinMode(LED_IS_CONNECTED, OUTPUT);
   pinMode(LED_ISNT_CONNECTED, OUTPUT);
   pinMode(LED_AUTH, OUTPUT);
+  pinMode(LED_NO_GPS, OUTPUT);
 
   // Leds initial conditions
   digitalWrite(LED_ON, LOW);
   digitalWrite(LED_IS_CONNECTED, LOW);
   digitalWrite(LED_ISNT_CONNECTED, HIGH);
   digitalWrite(LED_AUTH, LOW);
+  digitalWrite(LED_NO_GPS, HIGH);
 
   // Set the flash led parameters
   ledcSetup(LED_LEDC_CHANNEL, 5000, 8);
@@ -334,6 +337,13 @@ void loop() {
           longitude = gps.location.lng();
           satelite = gps.satellites.value();
 
+          if(satelite == 0){
+            digitalWrite(LED_NO_GPS, HIGH);
+          } else {
+            digitalWrite(LED_NO_GPS, LOW);
+          }
+          
+
           Serial.print(gps.satellites.value(), 6);  
           Serial.print(F(","));
           Serial.print(gps.location.lat(), 6);
@@ -499,10 +509,18 @@ void loadPhotoFirebase(){
     if (Firebase.Storage.upload(&fbdo, STORAGE_BUCKET_ID , FILE_PHOTO , mem_storage_type_flash, rutaDBSPhoto , "image/jpeg")){
       Serial.printf("\nDownload URL: %s\n", fbdo.downloadURL().c_str());
 
+      // Define the paths for loading data in the firebase database
       String rutaDBFotostr = "/Data_app/listado_buses/"+ruta+"/bus_"+id+"/reportes/reporte_"+idReporte+"/foto";
-
+      String rutaDBLatRepstr = "/Data_app/listado_buses/"+ruta+"/bus_"+id+"/reportes/reporte_"+idReporte+"/latitud";
+      String rutaDBLngRepstr = "/Data_app/listado_buses/"+ruta+"/bus_"+id+"/reportes/reporte_"+idReporte+"/longitud";
+      
       // Load the photo url in the RealTime Database
       loadDataStrFirebase(rutaDBFotostr, fbdo.downloadURL().c_str());
+
+      // Send data to the firebase database
+      loadDataFloatFirebase(rutaDBLatRepstr, latitude);
+      loadDataFloatFirebase(rutaDBLngRepstr, longitude);
+
       Serial.println("Foto enviada exitosamente");
 
     }
